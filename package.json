@@ -13,6 +13,8 @@
   ],
   "preview": true,
   "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:typescript",
     "onCommand:editor.openSubdocument"
   ],
   "main": "./lib/extension",
