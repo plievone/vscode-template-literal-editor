@@ -1,0 +1,48 @@
+{
+  "name": "vscode-template-literal-editor",
+  "displayName": "ES6 Template Literal Editor",
+  "description": "Use ctrl+enter to open ES6 template literals in a new editor with language support (default html).",
+  "version": "0.0.1",
+  "publisher": "plievone",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.5.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "preview": true,
+  "activationEvents": [
+    "onCommand:editor.openSubdocument"
+  ],
+  "main": "./lib/extension",
+  "contributes": {
+    "commands": [
+      {
+        "command": "editor.openSubdocument",
+        "title": "ES6 Template Literal Editor: Open ES6 Template Literal as a Subdocument"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "editor.openSubdocument",
+        "key": "ctrl+enter",
+        "when": "editorTextFocus"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "tsc -p ./",
+    "dev": "tsc -w -p ./",
+    "postinstall": "node ./node_modules/vscode/bin/install && tsc -p ./"
+  },
+  "dependencies": {
+    "lodash.throttle": "4.1.1"
+  },
+  "devDependencies": {
+    "@types/lodash.throttle": "^4.1.2",
+    "@types/node": "^6.0.40",
+    "typescript": "^2.2.1",
+    "vscode": "^1.0.0"
+  }
+}

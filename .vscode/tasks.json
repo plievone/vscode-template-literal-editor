@@ -1,0 +1,14 @@
+// A task runner that calls a custom npm script that compiles the extension.
+{
+	"version": "0.1.0",
+	"command": "npm",
+	"isShellCommand": true,
+	// show the output window only if unrecognized errors occur.
+	"showOutput": "silent",
+	// we run the custom script "dev" as defined in package.json
+	"args": ["run", "dev"],
+	// The tsc compiler is started in watching mode
+	"isBackground": true,
+	// use the standard tsc in watch mode problem matcher to find compile problems in the output.
+	"problemMatcher": "$tsc-watch"
+}
