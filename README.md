@@ -13,7 +13,7 @@ Instructions:
 
 This proof-of-concept uses public extension APIs and could be made quite a bit more polished if implemented in VS Code proper. There can be all kinds of edge cases that haven't been accounted for, and closing/saving should be more convenient, but otherwise it is already a helpful tool for reading and editing templates in their embedded languages.
 
-Note that as creating and saving files in multiple editors is quite poorly supported in extensions, this may not work for you. For this extension, Ctrl+Enter currently creates untitled documents, which hopefully work across platforms. Ctrl+Shift+Enter uses another way named way, which may be broken on some platforms.
+Note that as creating and saving files in multiple editors is quite poorly supported in extensions, this may not work for you. For this extension, Ctrl+Enter currently creates untitled documents, which hopefully work across platforms. Ctrl+Shift+Enter uses another named way, which may be broken on some platforms.
 
 Developed on VS Code 1.11.0-insider, so may break on newer versions.
 

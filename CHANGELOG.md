@@ -1,5 +1,6 @@
 Changelog:
 
+- [2017-03-24] v0.2.0 - Pushes extension API limits and closes stale template editors automatically by clearing them first (so save dialog does not appear), and then quickly giving them focus, so they can be closed via closeActiveEditor action. In some circumstances this may result in your input diverting to wrong editor, so beware, but it can be worked with.
 - [2017-03-24] v0.1.3 - Experiment with viewport scroll sync. Seems not possible from extension, unfortunately.
 - [2017-03-24] v0.1.2 - Clears stale editors so that they can be closed without a save dialog appearing. Unfortunately the empty editors can be a bit confusing now as the helpful message is gone.
 - [2017-03-24] v0.1.1 - Reuses stale editors so that reopening a template won't always create a new untitled document.
