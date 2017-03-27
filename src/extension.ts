@@ -92,7 +92,7 @@ export function activate(_context: vscode.ExtensionContext) {
         if (activeDocuments.has(doc)) {
             await activeDocuments.get(doc)!.closeActiveSubdocumentWithReason('Reloading.');
             if (withoutFilename) {
-                // Add artificial delay, as otherwise the new document is not created for some reason. Perhaps there's a race condition and the new doc is destroyed immediately.
+                // Add artificial delay, as otherwise the new document is not created for some reason. Perhaps there's a race condition in VS Code and the new doc is destroyed immediately.
                 await new Promise(resolve => {
                     setTimeout(() => {
                         resolve();
@@ -331,10 +331,10 @@ export function activate(_context: vscode.ExtensionContext) {
                 activeDocuments.delete(doc);
 
                 if (withoutFilename) {
-                    // Experimental closing via action, moves focus so may pipe quick keypresses to wrong doc unfortunately
+                    // Close untitled subdocs via action, moves focus so may pipe quick keypresses to wrong doc unfortunately
                     await closeSubeditor(vscode.window.activeTextEditor);
                 } else {
-                    // Alternatively just mark the document as tainted, as it will ask to be saved otherwise.
+                    // Mark titled documents as tainted, as they cannot be closed without being saved first.
                     await markSubdocumentAsTainted(reason);
                 }
 
@@ -366,18 +366,15 @@ export function activate(_context: vscode.ExtensionContext) {
             }
         }
 
-        // No proper way to close the subeditor, other than deprecated editor.hide() method or using actions to close editors.
-        // This tries to show the subeditor and then close it via command. Needs to suppress save dialog by clearing the doc,
-        // and focusing back to the original editor.
-        // Internally just editorService.closeEditor(position, input).
-        async function closeSubeditor(returnToEditor?: vscode.TextEditor) {
+        async function closeSubeditor(currentEditor?: vscode.TextEditor) {
             if (vscode.workspace.textDocuments.indexOf(subdoc) >= 0) {
                 try {
                     // TODO: subdocument may be visible in multiple editors, this closes just one of them.
                     let newSubeditor = await vscode.window.showTextDocument(subdoc, subeditor.viewColumn, /* preserveFocus */ true);
                     let ok = await newSubeditor.edit(builder => {
                         const totalRange = subdoc.validateRange(new vscode.Range(0, 0, 100000, 100000));
-                        builder.replace(totalRange, ''); // Return to initial state (empty document) to prevent save dialog
+                        // Return to initial state (empty document) to prevent save dialog
+                        builder.replace(totalRange, '');
                     });
                     if (!ok) {
                         throw new Error('Dispose edit could not succeed')
@@ -390,11 +387,11 @@ export function activate(_context: vscode.ExtensionContext) {
                             resolve();
                         }, 0);
                     });
-                    // NOTE! If the document was created "with filename, but untitled" it might always ask to be saved.
+                    // NOTE: This works only for untitled documents, otherwise will ask to be saved
                     await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
                     // Move focus back to where it was
-                    if (returnToEditor) {
-                        await vscode.window.showTextDocument(returnToEditor.document, returnToEditor.viewColumn, /* preserveFocus */ false);
+                    if (currentEditor) {
+                        await vscode.window.showTextDocument(currentEditor.document, currentEditor.viewColumn, /* preserveFocus */ false);
                     }
                 } catch (err) {
                     if (DEBUG) {
@@ -409,7 +406,7 @@ export function activate(_context: vscode.ExtensionContext) {
     }
 }
 
-// Cleanup on exit. This does not seem to help when reloading workspace? Subdocuments cannot be cleared on exit?
+// Cleanup on exit. This does not seem to help when reloading workspace? Subdocuments cannot be cleared on exit? To be able to close stale editors, must save state on each template open, and check state at plugin activation (and activate earlier, when js/ts loaded)?
 export async function deactivate(_context: vscode.ExtensionContext) {
     try {
         for (let handle of activeDocuments.values()) {
