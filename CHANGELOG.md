@@ -1,5 +1,6 @@
 Changelog:
 
+- [2017-03-25] v0.3.0 - Adds a 100 ms delay when reopening untitled templates (Ctrl+Enter), so reopening should work better. Templates with filenames (Ctrl+Shift+Enter) are a bit faster and easier to identify for those who can use them. Both have their caveats in terms of undo behavior, unnecessary save dialogs, stale editors when reloading, and platform support.
 - [2017-03-24] v0.2.0 - Pushes extension API limits and closes stale template editors automatically by clearing them first (so save dialog does not appear), and then quickly giving them focus, so they can be closed via closeActiveEditor action. In some circumstances this may result in your input diverting to wrong editor, so beware, but it can be worked with.
 - [2017-03-24] v0.1.3 - Experiment with viewport scroll sync. Seems not possible from extension, unfortunately.
 - [2017-03-24] v0.1.2 - Clears stale editors so that they can be closed without a save dialog appearing. Unfortunately the empty editors can be a bit confusing now as the helpful message is gone.
