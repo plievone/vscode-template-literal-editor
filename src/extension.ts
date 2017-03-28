@@ -25,6 +25,19 @@ export function activate(_context: vscode.ExtensionContext) {
     vscode.commands.registerTextEditorCommand('editor.openSubdocument.named', editor => {
         runCommand(editor, { withoutFilename: false });
     });
+    vscode.commands.registerTextEditorCommand('editor.closeSubdocuments', async _editor => {
+        try {
+            for (let handle of activeDocuments.values()) {
+                // Alternatively could close only the document/subdocument that is open in the current editor, but let's close
+                // them all for now.
+                await handle.closeActiveSubdocumentWithReason('Closed via shortcut. This virtual document can be closed.');
+            }
+        } catch (err) {
+            if (DEBUG) {
+                console.log('closeSubdocuments error: %s', err && err.stack || err);
+            }
+        }
+    });
 
     function runCommand(editor: vscode.TextEditor, options: { withoutFilename: boolean }) {
         const doc = editor.document;
@@ -334,7 +347,7 @@ export function activate(_context: vscode.ExtensionContext) {
                     // Close untitled subdocs via action, moves focus so may pipe quick keypresses to wrong doc unfortunately
                     await closeSubeditor(vscode.window.activeTextEditor);
                 } else {
-                    // Mark titled documents as tainted, as they cannot be closed without being saved first.
+                    // Mark titled documents as tainted. Note that revertAndCloseActiveEditors should work on them too.
                     await markSubdocumentAsTainted(reason);
                 }
 
@@ -368,18 +381,9 @@ export function activate(_context: vscode.ExtensionContext) {
 
         async function closeSubeditor(currentEditor?: vscode.TextEditor) {
             if (vscode.workspace.textDocuments.indexOf(subdoc) >= 0) {
+                // Note: subdocument may be visible in multiple editors, but luckily reverting seems to close all of them.
                 try {
-                    // TODO: subdocument may be visible in multiple editors, this closes just one of them.
-                    let newSubeditor = await vscode.window.showTextDocument(subdoc, subeditor.viewColumn, /* preserveFocus */ true);
-                    let ok = await newSubeditor.edit(builder => {
-                        const totalRange = subdoc.validateRange(new vscode.Range(0, 0, 100000, 100000));
-                        // Return to initial state (empty document) to prevent save dialog
-                        builder.replace(totalRange, '');
-                    });
-                    if (!ok) {
-                        throw new Error('Dispose edit could not succeed')
-                    }
-                    // Move focus temporarily to subdocument. Do this here to minimize time for the focus to be in wrong doc as the user is typing.
+                    // Move focus temporarily to subdocument. Try to minimize time for the focus to be in wrong doc as the user is typing.
                     await vscode.window.showTextDocument(subdoc, subeditor.viewColumn, /* preserveFocus */ false);
                     // Artificial delay, to prevent "TextEditor disposed" warning (in Extension Development Host only).
                     await new Promise(resolve => {
@@ -387,11 +391,17 @@ export function activate(_context: vscode.ExtensionContext) {
                             resolve();
                         }, 0);
                     });
-                    // NOTE: This works only for untitled documents, otherwise will ask to be saved
-                    await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-                    // Move focus back to where it was
+                    await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+                    // Move focus back to where it was, if available
                     if (currentEditor) {
-                        await vscode.window.showTextDocument(currentEditor.document, currentEditor.viewColumn, /* preserveFocus */ false);
+                        if (currentEditor === subeditor) {
+                            // Common case: closing subeditor via Ctrl+Shift+Backspace from subeditor. Focus on original document (if available) instead of the closed editor (which would create a new editor).
+                            if (vscode.workspace.textDocuments.indexOf(editor.document) >= 0) {
+                                await vscode.window.showTextDocument(editor.document, editor.viewColumn, /* preserveFocus */ false);
+                            }
+                        } else {
+                            await vscode.window.showTextDocument(currentEditor.document, currentEditor.viewColumn, /* preserveFocus */ false);
+                        }
                     }
                 } catch (err) {
                     if (DEBUG) {

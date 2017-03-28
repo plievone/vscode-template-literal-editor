@@ -1,5 +1,6 @@
 Changelog:
 
+- [2017-03-28] v0.4.0 - Ctrl+Backspace or Ctrl+Shift+Backspace closes open template editors quickly. Alternatively you can use "Revert and Close Editor" action.
 - [2017-03-27] v0.3.2 - Fixes CHANGELOG.md link and formatting in README.md. Have a nice day!
 - [2017-03-27] v0.3.1 - Adds use cases, changelog, and notes/caveats to README.md. This extension is maybe feature complete as a proof-of-concept for now until VS Code Extension API offers new opportunities. Typescript dependency is currently "^2.2.1", but it could be "next" too, if the need arises.
 - [2017-03-25] v0.3.0 - Adds a 100 ms delay when reopening untitled templates (Ctrl+Enter), so reopening should work better. Templates with filenames (Ctrl+Shift+Enter) are a bit faster and easier to identify for those who can use them. Both have their caveats in terms of undo behavior, unnecessary save dialogs, stale editors when reloading, and platform support.
