@@ -2,7 +2,7 @@
     "name": "vscode-template-literal-editor",
     "displayName": "ES6 Template Literal Editor",
     "description": "Use ctrl+enter to open ES6 template literals in a new editor with language support (HTML, CSS, SQL etc).",
-    "version": "0.3.1",
+    "version": "0.3.2",
     "publisher": "plievone",
     "license": "MIT",
     "engines": {
