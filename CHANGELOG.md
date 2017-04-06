@@ -1,5 +1,6 @@
 Changelog:
 
+- [2017-03-29] v0.4.1 - Added an icon to package.
 - [2017-03-28] v0.4.0 - Ctrl+Backspace or Ctrl+Shift+Backspace closes open template editors quickly. Alternatively you can use "Revert and Close Editor" action.
 - [2017-03-27] v0.3.2 - Fixes CHANGELOG.md link and formatting in README.md. Have a nice day!
 - [2017-03-27] v0.3.1 - Adds use cases, changelog, and notes/caveats to README.md. This extension is maybe feature complete as a proof-of-concept for now until VS Code Extension API offers new opportunities. Typescript dependency is currently "^2.2.1", but it could be "next" too, if the need arises.
