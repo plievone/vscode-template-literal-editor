@@ -4,6 +4,9 @@ import * as vscode from 'vscode';
 import * as ts from 'typescript';
 import throttle = require('lodash.throttle');
 
+// TODO: Clean up defensive development guards (DEBUG, most try-catches, etc), as the extension seems to work without errors, and the
+// vscode extension platform can mostly be trusted to do the right thing.
+
 const DEBUG = false;
 
 if (DEBUG) {
@@ -40,48 +43,80 @@ export function activate(_context: vscode.ExtensionContext) {
     });
 
     function runCommand(editor: vscode.TextEditor, options: { withoutFilename: boolean }) {
-        const doc = editor.document;
-        if (doc.languageId !== 'typescript' && doc.languageId !== 'javascript') {
-            return;
-        }
-
-        const cursorOffset = doc.offsetAt(editor.selection.active);
-        const source = ts.createSourceFile(doc.fileName, doc.getText(), ts.ScriptTarget.Latest, true);
-
-        // Find the outermost template literal
-        let template: ts.TemplateLiteral | undefined;
-        let token = (ts as any).getTokenAtPosition(source, cursorOffset);
-        while (token) {
-            if (token.kind === ts.SyntaxKind.NoSubstitutionTemplateLiteral || token.kind === ts.SyntaxKind.TemplateExpression) {
-                template = token;
-            }
-            token = token.parent;
-        }
-        if (!template) {
-            // Not inside any template literal
-            return;
-        }
-
-        vscode.languages.getLanguages().then(languages => {
-            // How to get proper language list, with icons etc?
-            const sorted = ['html'].concat(languages.filter(lang => lang !== 'html'));
-            vscode.window.showQuickPick(sorted, { placeHolder: 'Open in Language Mode' }).then(language => {
-                if (language) {
-                    activateSubdocument(
-                        language,
-                        editor,
-                        doc.positionAt(template!.getStart() + 1),
-                        doc.positionAt(template!.getEnd() - 1),
-                        options.withoutFilename,
-                    ).catch(err => {
-                        if (DEBUG) {
-                            console.log('ACTIVATION ERROR: %s', err && err.stack || err)
+        try {
+            const doc = editor.document;
+            const cursorOffset = doc.offsetAt(editor.selection.active);
+            let templateStart = 0;
+            let templateEnd = 0;
+            const lang = doc.languageId;
+            const config = vscode.workspace.getConfiguration('templateLiteralEditor.regexes');
+            if (config.has(lang) && typeof config.get(lang) === 'string') {
+                const text = doc.getText();
+                const matcher = new RegExp(config.get(lang) as string, 'g');
+                let match: RegExpExecArray | null;
+                while ((match = matcher.exec(text)) !== null) {
+                    if (typeof match[1] === 'string' && typeof match[2] === 'string' && typeof match[3] === 'string') {
+                        let candidateStart = match.index + match[1].length;
+                        let candidateEnd = candidateStart + match[2].length;
+                        if (candidateStart <= cursorOffset && cursorOffset <= candidateEnd) {
+                            templateStart = candidateStart;
+                            templateEnd = candidateEnd;
+                            break;
                         }
-                        throw err;
-                    });
+                    }
                 }
-            });
-        });
+            } else if (doc.languageId === 'typescript' || doc.languageId === 'javascript') {
+                // Default JS and TS to proper tokenizing instead of regexp matching
+                const source = ts.createSourceFile(doc.fileName, doc.getText(), ts.ScriptTarget.Latest, true);
+                // Find the outermost template literal
+                let template: ts.TemplateLiteral | undefined;
+                let token = (ts as any).getTokenAtPosition(source, cursorOffset);
+                while (token) {
+                    if (token.kind === ts.SyntaxKind.NoSubstitutionTemplateLiteral || token.kind === ts.SyntaxKind.TemplateExpression) {
+                        template = token;
+                    }
+                    token = token.parent;
+                }
+                if (template) {
+                    templateStart = template.getStart() + 1;
+                    templateEnd = template.getEnd() - 1;
+                }
+            } else {
+                // Omitted
+            }
+
+            if (templateStart !== 0) {
+                vscode.languages.getLanguages().then(languages => {
+                    // How to get proper language list, with icons etc?
+                    const sorted = ['html'].concat(languages.filter(lang => lang !== 'html'));
+                    vscode.window.showQuickPick(sorted, { placeHolder: 'Open in Language Mode' }).then(language => {
+                        if (language) {
+                            activateSubdocument(
+                                language,
+                                editor,
+                                doc.positionAt(templateStart),
+                                doc.positionAt(templateEnd),
+                                options.withoutFilename,
+                            ).catch(err => {
+                                if (DEBUG) {
+                                    console.log('ACTIVATION ERROR: %s', err && err.stack || err);
+                                }
+                                throw err;
+                            });
+                        }
+                    });
+                });
+            } else {
+                if (DEBUG) {
+                    console.log('RUNCOMMAND omitted for language %s', doc.languageId);
+                }
+            }
+        } catch (err) {
+            if (DEBUG) {
+                console.log('RUNCOMMAND ERROR: %s', err && err.stack || err);
+            }
+            throw err;
+        }
     }
 
     async function activateSubdocument(language: string, editor: vscode.TextEditor, start: vscode.Position, end: vscode.Position, withoutFilename: boolean) {

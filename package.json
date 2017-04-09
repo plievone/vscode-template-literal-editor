@@ -1,9 +1,9 @@
 {
     "name": "vscode-template-literal-editor",
-    "displayName": "ES6 Template Literal Editor",
-    "description": "Use ctrl+enter to open ES6 template literals in a new editor with language support (HTML, CSS, SQL etc).",
+    "displayName": "Template Literal Editor",
+    "description": "Use ctrl+enter to open ES6 template literals and other configured multi-line strings in any language in a synced editor, with language support (HTML, CSS, SQL, shell etc).",
     "icon": "icon.png",
-    "version": "0.4.1",
+    "version": "0.5.0",
     "publisher": "plievone",
     "license": "MIT",
     "engines": {
@@ -21,15 +21,15 @@
         "commands": [
             {
                 "command": "editor.openSubdocument",
-                "title": "ES6 Template Literal Editor: Open ES6 Template Literal as a Subdocument"
+                "title": "Template Literal Editor: Open Literal String as a Subdocument"
             },
             {
                 "command": "editor.openSubdocument.named",
-                "title": "ES6 Template Literal Editor: (named variant) Open ES6 Template Literal as a Subdocument"
+                "title": "Template Literal Editor: (named variant) Open Literal String as a Subdocument"
             },
             {
                 "command": "editor.closeSubdocuments",
-                "title": "ES6 Template Literal Editor: Close All Subdocuments"
+                "title": "Template Literal Editor: Close All Subdocuments"
             }
         ],
         "keybindings": [
@@ -53,7 +53,24 @@
                 "key": "ctrl+shift+backspace",
                 "when": "editorTextFocus"
             }
-        ]
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "Template Literal Editor configuration",
+            "properties": {
+                "templateLiteralEditor.regexes": {
+                    "type": "object",
+                    "default": {
+                        "coffeescript": "(\"\"\")([\\s\\S]*?)(\"\"\")",
+                        "python": "(\"\"\")([\\s\\S]*?)(\"\"\")"
+                    },
+                    "description": "Language-specific regular expressions for capturing template literals or other multi-line strings for editing. Each regexp must be in an escaped string form and must provide exactly three capture groups without gaps: begin, content, end. JavaScript and TypeScript default to language parsing instead of regexp matching, so only define them when you have a specific need.",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
     },
     "scripts": {
         "vscode:prepublish": "tsc -p ./",

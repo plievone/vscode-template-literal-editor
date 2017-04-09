@@ -1,10 +1,10 @@
-# ES6 Template Literal Editor for VS Code
+# Template Literal Editor for VS Code
 
-Open ES6 template literals in a new editor, with language support (HTML, CSS, SQL, shell etc).
+Open ES6 template literals and other configurable multi-line strings in any language in a synced editor, with language support (HTML, CSS, SQL, shell etc).
 
 Instructions:
 - Install extension from VS Code Marketplace
-- Open JavaScript or TypeScript file
+- Open JavaScript or TypeScript file, or a file in some other language if customized via "templateLiteralEditor.regexes" configuration
 - Place cursor inside any template literal string and press Ctrl+Enter or Ctrl+Shift+Enter
 - Select language (defaults to html)
 - Outermost template literal range opens in the selected language in a side-by-side view, synced with the original.
@@ -24,4 +24,4 @@ Note that creating and closing files in multiple editors is quite poorly support
 
 Developed on VS Code 1.11.0-insider on MacOS, as a personal tool, hoping something similar could be implemented properly with VS Code internals. Multiline strings could be focused in on many different host languages, in addition to JS and TS. It could be implemented as a side-by-side view similar to diff view, or as dimmed/highlighted layers on top of each other. For simplicity, the mapping is currently character-to-character, including line breaks. Also simple transformations, such as stripping whitespace and autoformatting, could be live mapped, but they may be best left for build tools and extensions working with template literals and template languages in question, and focus the feature on character-to-character document parts only.
 
-MIT License. Feel free to use the code however you wish. You can find the code inside the extension package, TypeScript sources are included. There is no repo yet, but you can send your greetings and bug reports via User Reviews on [Code Marketplace](https://marketplace.visualstudio.com/items?itemName=plievone.vscode-template-literal-editor).
+MIT License. Feel free to use the code however you wish. You can find the code inside the extension package, TypeScript sources are included. There is no repo yet, but you can send your greetings and bug reports via Q & A and User Reviews on [Code Marketplace](https://marketplace.visualstudio.com/items?itemName=plievone.vscode-template-literal-editor).
