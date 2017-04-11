@@ -56,11 +56,10 @@ export function activate(_context: vscode.ExtensionContext) {
                 let match: RegExpExecArray | null;
                 while ((match = matcher.exec(text)) !== null) {
                     if (typeof match[1] === 'string' && typeof match[2] === 'string' && typeof match[3] === 'string') {
-                        let candidateStart = match.index + match[1].length;
-                        let candidateEnd = candidateStart + match[2].length;
-                        if (candidateStart <= cursorOffset && cursorOffset <= candidateEnd) {
-                            templateStart = candidateStart;
-                            templateEnd = candidateEnd;
+                        // Cursor at boundaries is ok, but only inner content is used as a template
+                        if (match.index <= cursorOffset && cursorOffset <= match.index + match[0].length) {
+                            templateStart = match.index + match[1].length;
+                            templateEnd = match.index + match[1].length + match[2].length;
                             break;
                         }
                     }
@@ -171,29 +170,14 @@ export function activate(_context: vscode.ExtensionContext) {
         // Open editor in side by side view
         const subeditor = await vscode.window.showTextDocument(subdoc, editor.viewColumn === vscode.ViewColumn.One ? vscode.ViewColumn.Two : vscode.ViewColumn.One);
 
-        // Keep track of change origins. Only subdocument changes allowed. Initial edit needs to be suppressed.
-        let changeOrigin: 'activate' | 'subdocument' | 'dispose' | null = 'activate';
+        // Keep track of change origins. Both subdocument and document changes allowed. Initial edit needs to be suppressed.
+        let changeOrigin: 'activate' | 'document' | 'subdocument' | 'dispose' | null = 'activate';
 
-        // Install document change lister before first edit
+        // Install document change listener before first edit
         const changeListener = vscode.workspace.onDidChangeTextDocument(change => {
             // Suppress possible late edits
             if (changeOrigin === 'dispose') {
                 return;
-            }
-            if (change.document === doc) {
-                if (changeOrigin === 'subdocument') {
-                    // Subdocument sync received, mark further edits as external
-                    changeOrigin = null;
-                } else {
-                    // We don't track edits in original document, let's close
-                    // subdocument for safety. We don't want to retokenize the document and
-                    // try to infer which template is which.
-                    closeSubdocumentWithReason('Source document has been modified. This virtual editor can be closed.').catch(err => {
-                        if (DEBUG) {
-                            console.log('onDidChangeTextDocument error: %s', err && err.stack || err);
-                        }
-                    });
-                }
             }
             if (change.document === subdoc) {
                 // Suppress first edit.
@@ -201,14 +185,120 @@ export function activate(_context: vscode.ExtensionContext) {
                     changeOrigin = null;
                     return;
                 }
-
-                // We don't care about actual edits and partial templateRange synchronization,
-                // just copy everything in case there are changes
-                throttledDocumentSync();
+                if (changeOrigin === 'document') {
+                    // Document sync received, mark further edits as unknown
+                    changeOrigin = null;
+                } else {
+                    // We don't care about actual edits and partial templateRange synchronization,
+                    // just copy everything in case there are changes
+                    throttledDocumentSync();
+                }
+            } else if (change.document === doc) {
+                if (changeOrigin === 'subdocument') {
+                    // Subdocument sync received, mark further edits as unknown
+                    changeOrigin = null;
+                } else {
+                    // Track only simple changes in original document (does not touch template boundaries)
+                    const isValid = change.contentChanges.every(({ range: changeRange }) => {
+                        return (
+                            changeRange.end.isBefore(templateRange.start) ||
+                            changeRange.start.isAfter(templateRange.end) ||
+                            templateRange.contains(changeRange)
+                        );
+                    });
+                    if (!isValid) {
+                        // We don't track complex edits in original document, let's close
+                        // subdocument for safety. We don't want to retokenize the document and
+                        // try to infer which template is which.
+                        closeSubdocumentWithReason('Source document has been modified. This virtual editor can be closed.').catch(err => {
+                            if (DEBUG) {
+                                console.log('onDidChangeTextDocument error: %s', err && err.stack || err);
+                            }
+                        });
+                    } else {
+                        // Defer sync until all contentChanges are processed, so that changes, content and templateRange match
+                        let needsSync = false;
+                        change.contentChanges.forEach(({ range: changeRange, text: changeText }) => {
+                            if (changeRange.start.isAfter(templateRange.end)) {
+                                // Simplest case: No templateRange update needed for changes below template
+                                if (DEBUG) {
+                                    // Not actually needed, but can be enabled to see problems earlier
+                                    needsSync = true;
+                                }
+                            } else if (changeRange.end.isBefore(templateRange.start)) {
+                                // General case before template, a bit complex due to depending on both changeRange and changeText line count etc
+                                const insertedLines = changeText.split(/\r\n|\r|\n/); // TODO count with match and use doc.eol from vscode 1.11
+                                const lineDiff = insertedLines.length - (changeRange.end.line - changeRange.start.line + 1);
+                                let charDiff = 0;
+                                if (changeRange.end.line < templateRange.start.line) {
+                                    // Simple change above template, just count lines and move the templateRange if needed
+                                } else {
+                                    // Change touches the template start line
+                                    // first remove changeRange chars, it does not matter if there are multiple lines
+                                    charDiff -= (changeRange.end.character - changeRange.start.character);
+                                    // then add new changeText chars, only last line counts
+                                    charDiff += insertedLines[insertedLines.length - 1].length;
+                                    if (insertedLines.length > 1) {
+                                        // If a line break is introduced, push to beginning of line
+                                        charDiff -= changeRange.start.character;
+                                    }
+                                }
+                                if (lineDiff || charDiff) {
+                                    // Move templateRange accordingly
+                                    templateRange = new vscode.Range(
+                                        // Start row and col may change
+                                        templateRange.start.line + lineDiff,
+                                        templateRange.start.character + charDiff,
+                                        // End row may change
+                                        templateRange.end.line + lineDiff,
+                                        // End col changes only if the templateRange is a single line
+                                        templateRange.isSingleLine ? templateRange.end.character + charDiff : templateRange.end.character
+                                    );
+                                    if (DEBUG) {
+                                        // Not actually needed, but can be enabled to see problems earlier
+                                        needsSync = true;
+                                    }
+                                }
+                            } else if (templateRange.contains(changeRange)) {
+                                // General case inside template, also a bit complex due to depending on both changeRange and changeText line count etc
+                                const insertedLines = changeText.split(/\r\n|\r|\n/); // TODO count with match and use doc.eol from vscode 1.11
+                                const lineDiff = insertedLines.length - (changeRange.end.line - changeRange.start.line + 1);
+                                let charDiff = 0;
+                                if (changeRange.end.line < templateRange.end.line) {
+                                    // Simple change above template end, just count lines and move the templateRange end if needed
+                                } else {
+                                    // Change touches the template end line
+                                    // first remove changeRange chars, it does not matter if there are multiple lines
+                                    charDiff -= (changeRange.end.character - changeRange.start.character);
+                                    // then add new changeText chars, only last line counts
+                                    charDiff += insertedLines[insertedLines.length - 1].length;
+                                    if (insertedLines.length > 1) {
+                                        // If a line break is introduced, the last line starts at the beginning of line
+                                        charDiff -= changeRange.start.character;
+                                    }
+                                }
+                                // Move templateRange accordingly
+                                templateRange = new vscode.Range(
+                                    // Start row and col stay the same
+                                    templateRange.start.line,
+                                    templateRange.start.character,
+                                    // End row and col may change
+                                    templateRange.end.line + lineDiff,
+                                    templateRange.end.character + charDiff
+                                );
+                                needsSync = true;
+                            }
+                        });
+                        if (needsSync) {
+                            throttledSubdocumentSync();
+                        }
+                    }
+                }
             }
         });
 
         // Make first edit to the subdocument.
+        // NOTE untitled docs allow setting initial content as of vscode 1.11, use that when named docs are not used anymore.
         await subeditor.edit(builder => {
             const totalRange = subdoc.validateRange(new vscode.Range(0, 0, 100000, 100000))
             builder.replace(totalRange, doc.getText(templateRange));
@@ -222,7 +312,7 @@ export function activate(_context: vscode.ExtensionContext) {
         await vscode.commands.executeCommand('cursorMove', {
             to: 'right',
             value: Math.max(
-                editor.selection.active.character - (editor.selection.active.line === 0 ? templateRange.start.character : 0),
+                editor.selection.active.character - (subeditor.selection.active.line === 0 ? templateRange.start.character : 0),
                 0
             ) - subeditor.selection.active.character
         });
@@ -359,7 +449,41 @@ export function activate(_context: vscode.ExtensionContext) {
                 }
                 closeSubdocumentWithReason('Source document could not be synced with subdocument. This virtual editor can be closed.').catch(err => {
                     if (DEBUG) {
-                        console.log('thottleDocumentSync error: %s', err && err.stack || err);
+                        console.log('throttledDocumentSync error: %s', err && err.stack || err);
+                    }
+                });
+            }
+        }, 100);
+
+        // TODO
+
+        const throttledSubdocumentSync = throttle(async () => {
+            try {
+                // We have to always take a new reference to the editor, as it may have been hidden
+                // and a new editor may need to be created.
+                const newSubeditor = await vscode.window.showTextDocument(subdoc, subeditor.viewColumn, /* preserveFocus */ true);
+                const editOk = await newSubeditor.edit(editBuilder => {
+                    // We don't care about actual edits and partial templateRange synchronization,
+                    // just copy everything in case there are changes
+
+                    // Mark next edit as originating from document. Does not consider multiple edits
+                    // at the same time to both documents.
+                    changeOrigin = 'document';
+                    const totalRange = subdoc.validateRange(new vscode.Range(0, 0, 100000, 100000));
+                    // We copy whole literal to subdoc. Depends on both documents having the same config.
+                    editBuilder.replace(totalRange, doc.getText(templateRange));
+                });
+                if (!editOk) {
+                    // If there are multiple edits, they may not succeed, and then templateRange will be out of sync. Better to fail then.
+                    throw new Error('Sync to subdocument did not succeed');
+                }
+            } catch (err) {
+                if (DEBUG) {
+                    console.log('SUBDOC SYNC ERROR %s', err && err.stack || err);
+                }
+                closeSubdocumentWithReason('Subdocument could not be synced with original document. This virtual editor can be closed.').catch(err => {
+                    if (DEBUG) {
+                        console.log('throttledSubdocumentSync error: %s', err && err.stack || err);
                     }
                 });
             }

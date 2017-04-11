@@ -1,5 +1,7 @@
 Changelog:
 
+- [2017-04-11] v0.6.0 - Now syncs also changes from original document, if changes don't touch the boundaries of the literal in focus. This means you can keep the editor open and jump between two side-by-side languages to get language support on both. Could not break it when smoke testing, but please report if you find major bugs affecting your workflow.
+- [2017-04-09] v0.5.1 - Fixed a regression in syncing the initial cursor position inside template for convenience.
 - [2017-04-08] v0.5.0 - Now simply "Template Literal Editor", as any language can be enabled for literal editing via configuration. For example, default "templateLiteralEditor.regexes.coffeescript": "(\"\"\")([\\s\\S]*?)(\"\"\")" enables literal editing in CoffeeScript. Other language literal matchers can be customized for your needs, just remember that the regexp needs to be in an escaped string form and have exactly three capture groups without gaps. Matching literals with regexes is fragile and certainly won't cover all development needs, so JavaScript and TypeScript is still parsed by TypeScript parser by default as previously, to find only the proper literals and identify the outermost literal if there is nesting, commented code, etc. Enjoy!
 - [2017-03-29] v0.4.1 - Added an icon to package.
 - [2017-03-28] v0.4.0 - Ctrl+Backspace or Ctrl+Shift+Backspace closes open template editors quickly. Alternatively you can use "Revert and Close Editor" action.

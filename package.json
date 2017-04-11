@@ -3,7 +3,7 @@
     "displayName": "Template Literal Editor",
     "description": "Use ctrl+enter to open ES6 template literals and other configured multi-line strings in any language in a synced editor, with language support (HTML, CSS, SQL, shell etc).",
     "icon": "icon.png",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "publisher": "plievone",
     "license": "MIT",
     "engines": {
