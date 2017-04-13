@@ -4,8 +4,8 @@ import * as vscode from 'vscode';
 import * as ts from 'typescript';
 import throttle = require('lodash.throttle');
 
-// TODO: Clean up defensive development guards (DEBUG, most try-catches, etc), as the extension seems to work without errors, and the
-// vscode extension platform can mostly be trusted to do the right thing.
+// TODO: Clean up defensive development guards (DEBUG, most try-catches, etc), as the extension seems to work without errors,
+// and the vscode extension platform can mostly be trusted to do the right thing.
 
 const DEBUG = false;
 
@@ -52,7 +52,13 @@ export function activate(_context: vscode.ExtensionContext) {
             const config = vscode.workspace.getConfiguration('templateLiteralEditor.regexes');
             if (config.has(lang) && typeof config.get(lang) === 'string') {
                 const text = doc.getText();
-                const matcher = new RegExp(config.get(lang) as string, 'g');
+                let matcher: RegExp;
+                try {
+                    matcher = new RegExp(config.get(lang) as string, 'g');
+                } catch (err) {
+                    console.error('INVALID REGEX for %s: %s\n%s', lang, config.get(lang), err && err.stack || err);
+                    throw err;
+                }
                 let match: RegExpExecArray | null;
                 while ((match = matcher.exec(text)) !== null) {
                     if (typeof match[1] === 'string' && typeof match[2] === 'string' && typeof match[3] === 'string') {
@@ -71,7 +77,10 @@ export function activate(_context: vscode.ExtensionContext) {
                 let template: ts.TemplateLiteral | undefined;
                 let token = (ts as any).getTokenAtPosition(source, cursorOffset);
                 while (token) {
-                    if (token.kind === ts.SyntaxKind.NoSubstitutionTemplateLiteral || token.kind === ts.SyntaxKind.TemplateExpression) {
+                    if (
+                        token.kind === ts.SyntaxKind.NoSubstitutionTemplateLiteral ||
+                        token.kind === ts.SyntaxKind.TemplateExpression
+                    ) {
                         template = token;
                     }
                     token = token.parent;
@@ -107,7 +116,7 @@ export function activate(_context: vscode.ExtensionContext) {
                 });
             } else {
                 if (DEBUG) {
-                    console.log('RUNCOMMAND omitted for language %s', doc.languageId);
+                    console.log('RUNCOMMAND template not found under cursor for language %s', doc.languageId);
                 }
             }
         } catch (err) {
@@ -118,7 +127,13 @@ export function activate(_context: vscode.ExtensionContext) {
         }
     }
 
-    async function activateSubdocument(language: string, editor: vscode.TextEditor, start: vscode.Position, end: vscode.Position, withoutFilename: boolean) {
+    async function activateSubdocument(
+        language: string,
+        editor: vscode.TextEditor,
+        start: vscode.Position,
+        end: vscode.Position,
+        withoutFilename: boolean
+    ) {
         const doc = editor.document;
         // Keep track of document range where template literal resides
         let templateRange = new vscode.Range(start, end);
@@ -139,7 +154,8 @@ export function activate(_context: vscode.ExtensionContext) {
         if (activeDocuments.has(doc)) {
             await activeDocuments.get(doc)!.closeActiveSubdocumentWithReason('Reloading.');
             if (withoutFilename) {
-                // Add artificial delay, as otherwise the new document is not created for some reason. Perhaps there's a race condition in VS Code and the new doc is destroyed immediately.
+                // Add artificial delay, as otherwise the new document is not created for some reason.
+                // Perhaps there's a race condition in VS Code and the new doc is destroyed immediately.
                 await new Promise(resolve => {
                     setTimeout(() => {
                         resolve();
@@ -151,24 +167,33 @@ export function activate(_context: vscode.ExtensionContext) {
 
         // Create subdocument with chosen language/extension. "withoutFilename" version always creates a new untitled document,
         // the other version reuses the same document when languages match (and if the API works at all on Windows).
-        // Reusing is a bit quicker, and won't flicker as much, but results in intertwined undo histories and a larger amount of stale editors.
+        // Reusing is a bit quicker, and won't flicker as much, but results in intertwined undo histories and
+        // a larger amount of stale editors.
         // Could be made configurable depending on template tag, keybinding, etc.
         let subdoc: vscode.TextDocument;
 
         if (withoutFilename) {
-            // This form is not in typescript definitions but is documented here https://code.visualstudio.com/docs/extensionAPI/vscode-api#workspace.openTextDocument
+            // This form is not in typescript definitions but is documented here
+            // https://code.visualstudio.com/docs/extensionAPI/vscode-api#workspace.openTextDocument
             // It always creates a new untitled file.
             subdoc = await (vscode.workspace.openTextDocument as any)({ language }) as vscode.TextDocument;
         } else {
-            // This works usually nicely, reusing the same subdocument for same source, but may give invalid document on some platforms?
+            // This works usually nicely, reusing the same subdocument for same source, but may give invalid document
+            // on some platforms?
             const filepath = doc.fileName + '.virtual.' + language; // Needs path too? Don't want to save it...
-            subdoc = await vscode.workspace.openTextDocument(vscode.Uri.file(filepath).with({ scheme: 'untitled' })); // Not actually untitled as has a bogus filename, but helps keep track of tab names
+            subdoc = await vscode.workspace.openTextDocument(vscode.Uri.file(filepath).with({ scheme: 'untitled' }));
+            // Not actually untitled as has a bogus filename, but helps keep track of tab names
             // See https://github.com/Microsoft/vscode/issues/723#issuecomment-252411918
-            // _subdoc = await vscode.workspace.openTextDocument(vscode.Uri.parse('untitled:/' + filepath)); // Not actually untitled as has a bogus filename, but helps keep track of tab names
+            // _subdoc = await vscode.workspace.openTextDocument(vscode.Uri.parse('untitled:/' + filepath));
         }
 
         // Open editor in side by side view
-        const subeditor = await vscode.window.showTextDocument(subdoc, editor.viewColumn === vscode.ViewColumn.One ? vscode.ViewColumn.Two : vscode.ViewColumn.One);
+        // TODO experiment if there's access to options.selection.startLineNumber and options.selection.startColumn
+        // to set initial cursor position instead of using cursorMove commands
+        const subeditor = await vscode.window.showTextDocument(
+            subdoc,
+            editor.viewColumn === vscode.ViewColumn.One ? vscode.ViewColumn.Two : vscode.ViewColumn.One
+        );
 
         // Keep track of change origins. Both subdocument and document changes allowed. Initial edit needs to be suppressed.
         let changeOrigin: 'activate' | 'document' | 'subdocument' | 'dispose' | null = 'activate';
@@ -191,7 +216,7 @@ export function activate(_context: vscode.ExtensionContext) {
                 } else {
                     // We don't care about actual edits and partial templateRange synchronization,
                     // just copy everything in case there are changes
-                    throttledDocumentSync();
+                    throttledSyncToDocument();
                 }
             } else if (change.document === doc) {
                 if (changeOrigin === 'subdocument') {
@@ -210,7 +235,9 @@ export function activate(_context: vscode.ExtensionContext) {
                         // We don't track complex edits in original document, let's close
                         // subdocument for safety. We don't want to retokenize the document and
                         // try to infer which template is which.
-                        closeSubdocumentWithReason('Source document has been modified. This virtual editor can be closed.').catch(err => {
+                        closeSubdocumentWithReason(
+                            'Source document has been modified. This virtual editor can be closed.'
+                        ).catch(err => {
                             if (DEBUG) {
                                 console.log('onDidChangeTextDocument error: %s', err && err.stack || err);
                             }
@@ -226,8 +253,10 @@ export function activate(_context: vscode.ExtensionContext) {
                                     needsSync = true;
                                 }
                             } else if (changeRange.end.isBefore(templateRange.start)) {
-                                // General case before template, a bit complex due to depending on both changeRange and changeText line count etc
-                                const insertedLines = changeText.split(/\r\n|\r|\n/); // TODO count with match and use doc.eol from vscode 1.11
+                                // General case before template, a bit complex due to depending on both changeRange and
+                                // changeText line count etc
+                                // TODO count with match and use doc.eol from vscode 1.11
+                                const insertedLines = changeText.split(/\r\n|\r|\n/);
                                 const lineDiff = insertedLines.length - (changeRange.end.line - changeRange.start.line + 1);
                                 let charDiff = 0;
                                 if (changeRange.end.line < templateRange.start.line) {
@@ -243,7 +272,7 @@ export function activate(_context: vscode.ExtensionContext) {
                                         charDiff -= changeRange.start.character;
                                     }
                                 }
-                                if (lineDiff || charDiff) {
+                                if (lineDiff || charDiff) {
                                     // Move templateRange accordingly
                                     templateRange = new vscode.Range(
                                         // Start row and col may change
@@ -252,7 +281,9 @@ export function activate(_context: vscode.ExtensionContext) {
                                         // End row may change
                                         templateRange.end.line + lineDiff,
                                         // End col changes only if the templateRange is a single line
-                                        templateRange.isSingleLine ? templateRange.end.character + charDiff : templateRange.end.character
+                                        templateRange.isSingleLine ?
+                                            templateRange.end.character + charDiff :
+                                            templateRange.end.character
                                     );
                                     if (DEBUG) {
                                         // Not actually needed, but can be enabled to see problems earlier
@@ -260,12 +291,15 @@ export function activate(_context: vscode.ExtensionContext) {
                                     }
                                 }
                             } else if (templateRange.contains(changeRange)) {
-                                // General case inside template, also a bit complex due to depending on both changeRange and changeText line count etc
-                                const insertedLines = changeText.split(/\r\n|\r|\n/); // TODO count with match and use doc.eol from vscode 1.11
+                                // General case inside template, also a bit complex due to depending on both changeRange and
+                                // changeText line count etc
+                                // TODO count with match and use doc.eol from vscode 1.11
+                                const insertedLines = changeText.split(/\r\n|\r|\n/);
                                 const lineDiff = insertedLines.length - (changeRange.end.line - changeRange.start.line + 1);
                                 let charDiff = 0;
                                 if (changeRange.end.line < templateRange.end.line) {
-                                    // Simple change above template end, just count lines and move the templateRange end if needed
+                                    // Simple change above template end, just count lines and move the templateRange end
+                                    // if needed
                                 } else {
                                     // Change touches the template end line
                                     // first remove changeRange chars, it does not matter if there are multiple lines
@@ -290,7 +324,7 @@ export function activate(_context: vscode.ExtensionContext) {
                             }
                         });
                         if (needsSync) {
-                            throttledSubdocumentSync();
+                            throttledSyncToSubdocument();
                         }
                     }
                 }
@@ -354,13 +388,16 @@ export function activate(_context: vscode.ExtensionContext) {
         //             // editor.setDecorations(
         //             //     decorationType, [
         //             //         new vscode.Range(
-        //             //             templateRange.start.line + subeditor.selection.active.line, 0, templateRange.start.line + subeditor.selection.active.line, 1,
+        //             //             templateRange.start.line + subeditor.selection.active.line,
+        //             //             0,
+        //             //             templateRange.start.line + subeditor.selection.active.line,
+        //             //             1,
         //             //         )
         //             //     ]
         //             // )
         //
         //             // Experimental cursor sync (flickers)
-        //             // await vscode.window.showTextDocument(doc, editor.viewColumn, /* preserveFocus */ false);
+        //             // await vscode.window.showTextDocument(doc, editor.viewColumn, /*preserveFocus*/ false);
         //             // await vscode.commands.executeCommand('cursorMove', {
         //             //     to: 'down',
         //             //     value: (templateRange.start.line + subeditor.selection.active.line) - editor.selection.active.line
@@ -370,7 +407,7 @@ export function activate(_context: vscode.ExtensionContext) {
         //             //     value: (subeditor.selection.active.line === 0 ? templateRange.start.character : 0) +
         //             //         subeditor.selection.active.character - editor.selection.active.character
         //             // });
-        //             // await vscode.window.showTextDocument(subdoc, subeditor.viewColumn, /* preserveFocus */ false);
+        //             // await vscode.window.showTextDocument(subdoc, subeditor.viewColumn, /*preserveFocus*/ false);
         //
         //         })().catch(err => {
         //             if (DEBUG) {
@@ -415,11 +452,11 @@ export function activate(_context: vscode.ExtensionContext) {
         // });
         // It would be nice if saving the subdocument could be interrupted and the original would be saved instead.
 
-        const throttledDocumentSync = throttle(async () => {
+        const throttledSyncToDocument = throttle(async () => {
             try {
                 // We have to always take a new reference to the editor, as it may have been hidden
                 // and a new editor may need to be created.
-                const newEditor = await vscode.window.showTextDocument(doc, editor.viewColumn, /* preserveFocus */ true);
+                const newEditor = await vscode.window.showTextDocument(doc, editor.viewColumn, /*preserveFocus*/ true);
                 const editOk = await newEditor.edit(editBuilder => {
                     // We don't care about actual edits and partial templateRange synchronization,
                     // just copy everything in case there are changes
@@ -436,7 +473,8 @@ export function activate(_context: vscode.ExtensionContext) {
                         // End row depends on subdoc line count
                         templateRange.start.line + subdoc.lineCount - 1,
                         // End col depends on whether there is only single line or more
-                        (subdoc.lineCount === 1 ? templateRange.start.character : 0) + subdoc.lineAt(subdoc.lineCount - 1).range.end.character
+                        (subdoc.lineCount === 1 ? templateRange.start.character : 0) +
+                            subdoc.lineAt(subdoc.lineCount - 1).range.end.character
                     )
                 });
                 if (!editOk) {
@@ -447,21 +485,23 @@ export function activate(_context: vscode.ExtensionContext) {
                 if (DEBUG) {
                     console.log('SYNC ERROR %s', err && err.stack || err);
                 }
-                closeSubdocumentWithReason('Source document could not be synced with subdocument. This virtual editor can be closed.').catch(err => {
+                closeSubdocumentWithReason(
+                    'Source document could not be synced with subdocument. This virtual editor can be closed.'
+                ).catch(err => {
                     if (DEBUG) {
-                        console.log('throttledDocumentSync error: %s', err && err.stack || err);
+                        console.log('throttledSyncToDocument error: %s', err && err.stack || err);
                     }
                 });
             }
         }, 100);
 
-        // TODO
-
-        const throttledSubdocumentSync = throttle(async () => {
+        const throttledSyncToSubdocument = throttle(async () => {
             try {
                 // We have to always take a new reference to the editor, as it may have been hidden
                 // and a new editor may need to be created.
-                const newSubeditor = await vscode.window.showTextDocument(subdoc, subeditor.viewColumn, /* preserveFocus */ true);
+                const newSubeditor = await vscode.window.showTextDocument(
+                    subdoc, subeditor.viewColumn, /*preserveFocus*/ true
+                );
                 const editOk = await newSubeditor.edit(editBuilder => {
                     // We don't care about actual edits and partial templateRange synchronization,
                     // just copy everything in case there are changes
@@ -474,16 +514,19 @@ export function activate(_context: vscode.ExtensionContext) {
                     editBuilder.replace(totalRange, doc.getText(templateRange));
                 });
                 if (!editOk) {
-                    // If there are multiple edits, they may not succeed, and then templateRange will be out of sync. Better to fail then.
+                    // If there are multiple edits, they may not succeed, and then templateRange will be out of sync.
+                    // Better to fail then.
                     throw new Error('Sync to subdocument did not succeed');
                 }
             } catch (err) {
                 if (DEBUG) {
                     console.log('SUBDOC SYNC ERROR %s', err && err.stack || err);
                 }
-                closeSubdocumentWithReason('Subdocument could not be synced with original document. This virtual editor can be closed.').catch(err => {
+                closeSubdocumentWithReason(
+                    'Subdocument could not be synced with original document. This virtual editor can be closed.'
+                ).catch(err => {
                     if (DEBUG) {
-                        console.log('throttledSubdocumentSync error: %s', err && err.stack || err);
+                        console.log('throttledSyncToSubdocument error: %s', err && err.stack || err);
                     }
                 });
             }
@@ -509,8 +552,6 @@ export function activate(_context: vscode.ExtensionContext) {
                     // Mark titled documents as tainted. Note that revertAndCloseActiveEditors should work on them too.
                     await markSubdocumentAsTainted(reason);
                 }
-
-                // TODO: perhaps there could be a status bar widget of some sort that would allow easy closing of subdocuments.
             } catch (err) {
                 if (DEBUG) {
                     console.log('closeSubdocumentWithReason error: %s', err && err.stack || err);
@@ -522,7 +563,9 @@ export function activate(_context: vscode.ExtensionContext) {
         async function markSubdocumentAsTainted(reason: string) {
             if (vscode.workspace.textDocuments.indexOf(subdoc) >= 0) {
                 try {
-                    let newSubeditor = await vscode.window.showTextDocument(subdoc, subeditor.viewColumn, /* preserveFocus */ true);
+                    let newSubeditor = await vscode.window.showTextDocument(
+                        subdoc, subeditor.viewColumn, /*preserveFocus*/ true
+                    );
                     let ok = await newSubeditor.edit(builder => {
                         const totalRange = subdoc.validateRange(new vscode.Range(0, 0, 100000, 100000));
                         builder.replace(totalRange, reason || 'This virtual editor can be closed.');
@@ -542,8 +585,9 @@ export function activate(_context: vscode.ExtensionContext) {
             if (vscode.workspace.textDocuments.indexOf(subdoc) >= 0) {
                 // Note: subdocument may be visible in multiple editors, but luckily reverting seems to close all of them.
                 try {
-                    // Move focus temporarily to subdocument. Try to minimize time for the focus to be in wrong doc as the user is typing.
-                    await vscode.window.showTextDocument(subdoc, subeditor.viewColumn, /* preserveFocus */ false);
+                    // Move focus temporarily to subdocument. Try to minimize time for the focus to be in wrong doc as the
+                    // user is typing.
+                    await vscode.window.showTextDocument(subdoc, subeditor.viewColumn, /*preserveFocus*/ false);
                     // Artificial delay, to prevent "TextEditor disposed" warning (in Extension Development Host only).
                     await new Promise(resolve => {
                         setTimeout(() => {
@@ -554,12 +598,17 @@ export function activate(_context: vscode.ExtensionContext) {
                     // Move focus back to where it was, if available
                     if (currentEditor) {
                         if (currentEditor === subeditor) {
-                            // Common case: closing subeditor via Ctrl+Shift+Backspace from subeditor. Focus on original document (if available) instead of the closed editor (which would create a new editor).
+                            // Common case: closing subeditor via Ctrl+Shift+Backspace from subeditor. Focus on
+                            /// original document (if available) instead of the closed editor (which would create a new editor).
                             if (vscode.workspace.textDocuments.indexOf(editor.document) >= 0) {
-                                await vscode.window.showTextDocument(editor.document, editor.viewColumn, /* preserveFocus */ false);
+                                await vscode.window.showTextDocument(
+                                    editor.document, editor.viewColumn, /*preserveFocus*/ false
+                                );
                             }
                         } else {
-                            await vscode.window.showTextDocument(currentEditor.document, currentEditor.viewColumn, /* preserveFocus */ false);
+                            await vscode.window.showTextDocument(
+                                currentEditor.document, currentEditor.viewColumn, /*preserveFocus*/ false
+                            );
                         }
                     }
                 } catch (err) {
@@ -575,7 +624,9 @@ export function activate(_context: vscode.ExtensionContext) {
     }
 }
 
-// Cleanup on exit. This does not seem to help when reloading workspace? Subdocuments cannot be cleared on exit? To be able to close stale editors, must save state on each template open, and check state at plugin activation (and activate earlier, when js/ts loaded)?
+// Cleanup on exit. This does not seem to help when reloading workspace? Subdocuments cannot be cleared on exit?
+// To be able to close stale editors, must save state on each template open, and check state at plugin activation
+// (and activate earlier, when js/ts loaded)?
 export async function deactivate(_context: vscode.ExtensionContext) {
     try {
         for (let handle of activeDocuments.values()) {
