@@ -15,6 +15,8 @@ if (DEBUG) {
     });
 }
 
+let hasWarnedAboutDeprecation = false;
+
 // Tracks all documents with open subdocuments
 const activeDocuments = new Map<vscode.TextDocument, {
     closeActiveSubdocumentWithReason(reason: string): Promise<void>
@@ -23,9 +25,16 @@ const activeDocuments = new Map<vscode.TextDocument, {
 export function activate(_context: vscode.ExtensionContext) {
 
     vscode.commands.registerTextEditorCommand('editor.openSubdocument', editor => {
+        // TODO perhaps if called on a subdocument could focus on original document and sync cursor for convenience
         runCommand(editor, { withoutFilename: true });
     });
     vscode.commands.registerTextEditorCommand('editor.openSubdocument.named', editor => {
+        if (!hasWarnedAboutDeprecation) {
+            vscode.window.showWarningMessage(
+                'Template Literal Editor: Named documents are deprecated and will be removed in a future version. Use Ctrl+Enter instead.'
+            );
+            hasWarnedAboutDeprecation = true;
+        }
         runCommand(editor, { withoutFilename: false });
     });
     vscode.commands.registerTextEditorCommand('editor.closeSubdocuments', async _editor => {
@@ -56,7 +65,10 @@ export function activate(_context: vscode.ExtensionContext) {
                 try {
                     matcher = new RegExp(config.get(lang) as string, 'g');
                 } catch (err) {
-                    console.error('INVALID REGEX for %s: %s\n%s', lang, config.get(lang), err && err.stack || err);
+                    console.error(
+                        'INVALID REGEX in templateLiteralEditor.regexes.%s: %s\n%s',
+                        lang, config.get(lang), err && err.stack || err
+                    );
                     throw err;
                 }
                 let match: RegExpExecArray | null;
@@ -72,9 +84,10 @@ export function activate(_context: vscode.ExtensionContext) {
                 }
             } else if (doc.languageId === 'typescript' || doc.languageId === 'javascript') {
                 // Default JS and TS to proper tokenizing instead of regexp matching
-                const source = ts.createSourceFile(doc.fileName, doc.getText(), ts.ScriptTarget.Latest, true);
+                const source = ts.createSourceFile(doc.fileName, doc.getText(), ts.ScriptTarget.Latest, /*setParentNodes*/ true);
                 // Find the outermost template literal
                 let template: ts.TemplateLiteral | undefined;
+                // getTokenAtPosition is not really public but widely used. May break in a future version.
                 let token = (ts as any).getTokenAtPosition(source, cursorOffset);
                 while (token) {
                     if (
@@ -115,9 +128,10 @@ export function activate(_context: vscode.ExtensionContext) {
                     });
                 });
             } else {
-                if (DEBUG) {
-                    console.log('RUNCOMMAND template not found under cursor for language %s', doc.languageId);
-                }
+                console.warn(
+                    'Template not found under cursor. If in error, please configure proper templateLiteralEditor.regexes.%s',
+                    doc.languageId
+                );
             }
         } catch (err) {
             if (DEBUG) {
@@ -147,6 +161,7 @@ export function activate(_context: vscode.ExtensionContext) {
         // // Move cursor back to where it was
         // await vscode.commands.executeCommand('cursorMove', {
         //     to: 'down',
+        //     by: 'line',
         //     value: cursorPosition.line - viewPortTopPosition.line
         // });
 
@@ -176,7 +191,10 @@ export function activate(_context: vscode.ExtensionContext) {
             // This form is not in typescript definitions but is documented here
             // https://code.visualstudio.com/docs/extensionAPI/vscode-api#workspace.openTextDocument
             // It always creates a new untitled file.
-            subdoc = await (vscode.workspace.openTextDocument as any)({ language }) as vscode.TextDocument;
+            // NOTE: experimenting with setting content here to fix undo history including the initially empty doc
+            // v1.11 api only
+            subdoc = await (vscode.workspace.openTextDocument as any)({ language, content: doc.getText(templateRange) }) as vscode.TextDocument;
+            // subdoc = await (vscode.workspace.openTextDocument as any)({ language }) as vscode.TextDocument;
         } else {
             // This works usually nicely, reusing the same subdocument for same source, but may give invalid document
             // on some platforms?
@@ -196,7 +214,7 @@ export function activate(_context: vscode.ExtensionContext) {
         );
 
         // Keep track of change origins. Both subdocument and document changes allowed. Initial edit needs to be suppressed.
-        let changeOrigin: 'activate' | 'document' | 'subdocument' | 'dispose' | null = 'activate';
+        let changeOrigin: 'activate' | 'document' | 'subdocument' | 'dispose' | null = withoutFilename ? null : 'activate';
 
         // Install document change listener before first edit
         const changeListener = vscode.workspace.onDidChangeTextDocument(change => {
@@ -331,25 +349,44 @@ export function activate(_context: vscode.ExtensionContext) {
             }
         });
 
-        // Make first edit to the subdocument.
-        // NOTE untitled docs allow setting initial content as of vscode 1.11, use that when named docs are not used anymore.
-        await subeditor.edit(builder => {
-            const totalRange = subdoc.validateRange(new vscode.Range(0, 0, 100000, 100000))
-            builder.replace(totalRange, doc.getText(templateRange));
-        }, { undoStopBefore: false, undoStopAfter: true });
+        if (!withoutFilename) {
+            // Make first edit to the subdocument.
+            // NOTE untitled docs allow setting initial content as of vscode 1.11, remove this when not needed anymore
+            await subeditor.edit(builder => {
+                const totalRange = subdoc.validateRange(new vscode.Range(0, 0, 100000, 100000))
+                builder.replace(totalRange, doc.getText(templateRange));
+            }, { undoStopBefore: false, undoStopAfter: true });
+        }
 
         // Move cursor to proper position
-        await vscode.commands.executeCommand('cursorMove', {
-            to: 'down',
-            value: (editor.selection.active.line - templateRange.start.line) - subeditor.selection.active.line
-        });
-        await vscode.commands.executeCommand('cursorMove', {
-            to: 'right',
-            value: Math.max(
-                editor.selection.active.character - (subeditor.selection.active.line === 0 ? templateRange.start.character : 0),
-                0
-            ) - subeditor.selection.active.character
-        });
+        const lineDelta = (editor.selection.active.line - templateRange.start.line) - subeditor.selection.active.line;
+        if (lineDelta) {
+            await vscode.commands.executeCommand('cursorMove', {
+                to: 'down',
+                by: 'line',
+                value: lineDelta
+            });
+        }
+        let targetChar = editor.selection.active.character;
+        if (editor.selection.active.line === templateRange.end.line && targetChar > templateRange.end.character) {
+            targetChar = templateRange.end.character;
+        }
+        if (editor.selection.active.line === templateRange.start.line) {
+            targetChar -= templateRange.start.character;
+            if (targetChar < 0) {
+                targetChar = 0;
+            }
+        }
+        let charDelta = targetChar - subeditor.selection.active.character;
+        // Let's limit iteration count in case target cannot be reached for some reason
+        for (let iter = 0; charDelta && iter < 100; iter++) {
+            await vscode.commands.executeCommand('cursorMove', {
+                to: 'right',
+                by: 'character',
+                value: charDelta // Capped at wrapped line length for some reason? So iterate when needed.
+            });
+            charDelta = targetChar - subeditor.selection.active.character;
+        }
 
         // // How to scroll subdocument to match document viewport, and keep them in sync?
         // await vscode.commands.executeCommand('revealLine', {
@@ -368,10 +405,6 @@ export function activate(_context: vscode.ExtensionContext) {
             lineNumber: subeditor.selection.active.line,
             at: 'center'
         });
-
-        // const statusBarItem = vscode.window.createStatusBarItem();
-        // statusBarItem.text = 'Currently open template editors $(file-code): sync scroll, close all, etc';
-        // statusBarItem.show();
 
         // const decorationType = vscode.window.createTextEditorDecorationType({
         //     isWholeLine: true,
@@ -450,7 +483,30 @@ export function activate(_context: vscode.ExtensionContext) {
         //         disposeSubdocument('Document options changed. This virtual document can be closed.');
         //     }
         // });
-        // It would be nice if saving the subdocument could be interrupted and the original would be saved instead.
+
+        // Override ordinary save with saving of the original document.
+        function newSaveOverride(): vscode.Disposable {
+            return vscode.commands.registerTextEditorCommand('workbench.action.files.save', () => {
+                doc.save().then(_saved => {
+                }, err => {
+                    if (DEBUG) {
+                        console.error('Saving of document failed: %s', err && err.stack || err);
+                    }
+                    saveOverride.dispose();
+                    throw err;
+                });
+            });
+        }
+        let saveOverride = newSaveOverride();
+        // Always remove saveOverride when active editor changes, and set it again if focus is restored
+        // NOTE: disposing saveOverride is very important, as othewise nothing can be saved in vscode, for any document.
+        // So it is important to not fail setting this handler.
+        const activeTextEditorChangeListener = vscode.window.onDidChangeActiveTextEditor(newEditor => {
+            saveOverride.dispose();
+            if (newEditor && newEditor.document === subdoc) {
+                saveOverride = newSaveOverride();
+            }
+        });
 
         const throttledSyncToDocument = throttle(async () => {
             try {
@@ -474,7 +530,7 @@ export function activate(_context: vscode.ExtensionContext) {
                         templateRange.start.line + subdoc.lineCount - 1,
                         // End col depends on whether there is only single line or more
                         (subdoc.lineCount === 1 ? templateRange.start.character : 0) +
-                            subdoc.lineAt(subdoc.lineCount - 1).range.end.character
+                        subdoc.lineAt(subdoc.lineCount - 1).range.end.character
                     )
                 });
                 if (!editOk) {
@@ -543,6 +599,9 @@ export function activate(_context: vscode.ExtensionContext) {
                 documentCloseListener.dispose();
                 subdocumentCloseListener.dispose();
 
+                saveOverride.dispose();
+                activeTextEditorChangeListener.dispose();
+
                 activeDocuments.delete(doc);
 
                 if (withoutFilename) {
@@ -598,7 +657,7 @@ export function activate(_context: vscode.ExtensionContext) {
                     // Move focus back to where it was, if available
                     if (currentEditor) {
                         if (currentEditor === subeditor) {
-                            // Common case: closing subeditor via Ctrl+Shift+Backspace from subeditor. Focus on
+                            // Common case: closing subeditor via Ctrl+Backspace from subeditor. Focus on
                             /// original document (if available) instead of the closed editor (which would create a new editor).
                             if (vscode.workspace.textDocuments.indexOf(editor.document) >= 0) {
                                 await vscode.window.showTextDocument(
