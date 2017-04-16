@@ -1,8 +1,8 @@
 {
     "name": "vscode-template-literal-editor",
     "displayName": "Template Literal Editor",
-    "version": "0.7.0",
-    "description": "Use ctrl+enter to open ES6 template literals and other configured multi-line strings or heredocs in any language in a synced editor, with language support (HTML, CSS, SQL, shell, markdown etc).",
+    "version": "0.8.1",
+    "description": "Use Ctrl+Enter to open ES6 template literals and other configured multi-line strings or heredocs in any language in a synced editor, with language support (HTML, CSS, SQL, shell, markdown etc).",
     "keywords": [
         "highlight",
         "syntax",
@@ -21,11 +21,13 @@
         "dart",
         "eiffel",
         "elixir",
+        "elm",
         "fsharp",
         "go",
         "groovy",
         "lua",
         "markdown",
+        "nim",
         "objective-cpp",
         "perl",
         "php",
@@ -40,6 +42,10 @@
     "icon": "icon.png",
     "publisher": "plievone",
     "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/plievone/vscode-template-literal-editor.git"
+    },
     "engines": {
         "vscode": "^1.11.0"
     },
@@ -48,8 +54,7 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:editor.openSubdocument",
-        "onCommand:editor.openSubdocument.named"
+        "onCommand:editor.openSubdocument"
     ],
     "main": "./lib/extension",
     "contributes": {
@@ -57,10 +62,6 @@
             {
                 "command": "editor.openSubdocument",
                 "title": "Template Literal Editor: Open Literal String as a Subdocument"
-            },
-            {
-                "command": "editor.openSubdocument.named",
-                "title": "Template Literal Editor: (named variant) Open Literal String as a Subdocument"
             },
             {
                 "command": "editor.closeSubdocuments",
@@ -74,18 +75,8 @@
                 "when": "editorTextFocus"
             },
             {
-                "command": "editor.openSubdocument.named",
-                "key": "ctrl+shift+enter",
-                "when": "editorTextFocus"
-            },
-            {
                 "command": "editor.closeSubdocuments",
                 "key": "ctrl+backspace",
-                "when": "editorTextFocus"
-            },
-            {
-                "command": "editor.closeSubdocuments",
-                "key": "ctrl+shift+backspace",
                 "when": "editorTextFocus"
             }
         ],
@@ -103,15 +94,17 @@
                         "dart": "(''')([\\s\\S]*?)(''')",
                         "eiffel": "(\"\\[)([\\s\\S]*?)(\\]\")",
                         "elixir": "(\"\"\")([\\s\\S]*?)(\"\"\")",
+                        "elm": "(\"\"\")([\\s\\S]*?)(\"\"\")",
                         "fsharp": "(@\")([\\s\\S]*?)(\")",
                         "go": "(`)([\\s\\S]*?)(`)",
                         "groovy": "(''')([\\s\\S]*?)(''')",
                         "javascriptreact": "(`)([\\s\\S]*?)(`)",
                         "lua": "(\\[\\[)([\\s\\S]*?)(\\]\\])",
                         "markdown": "(```.*)([\\s\\S]*?)(```)",
+                        "nim": "(\"\"\")([\\s\\S]*?)(\"\"\")",
                         "objective-cpp": "(R\"\\()([\\s\\S]*?)(\\)\")",
                         "perl": "(<<['\"]?EOF['\"]?)([\\s\\S]*?)(EOF)",
-                        "perl6": "(<<['\"]?EOF['\"]?)([\\s\\S]*?)(EOF)",
+                        "perl6": "(:(to|heredoc)(:c)?[[/\"]EOF[[/\"];)([\\s\\S]*?)(EOF)",
                         "php": "(<<<['\"]?EOD['\"]?)([\\s\\S]*?)(EOD)",
                         "powershell": "(@\")([\\s\\S]*?)(\"@)",
                         "python": "(\"\"\")([\\s\\S]*?)(\"\"\")",
