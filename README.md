@@ -10,7 +10,7 @@ Instructions:
 - Outermost template literal range opens in the selected language in a side-by-side view, synced with the original. Multiple cursors and undo works as usual, and saving the template results in saving of the original document.
 - Enjoy syntax highlighting, completions, formatting, commenting, snippets, your preferred editing extensions, etc!
 - When you edit the original document the template editor is kept in sync. If template boundaries are modified or a sync error happens, then the template literal editor is closed for safety.
-- Close views by pressing Ctrl+Enter, Ctrl+Backspace (in any editor), or via "Revert And Close Editor" action, to avoid unnecessary save dialogs.
+- Ctrl+Enter in the literal editor closes it and keeps the cursor position. Also ordinary close or "Revert And Close Editor" action should work without unnecessary save dialogs. There's also a Ctrl+Shift+Backspace shortcut to close all literal editors quickly, from any editor.
 
 ## Releases
 

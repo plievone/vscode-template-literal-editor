@@ -1,7 +1,7 @@
 {
     "name": "vscode-template-literal-editor",
     "displayName": "Template Literal Editor",
-    "version": "0.8.1",
+    "version": "0.8.2",
     "description": "Use Ctrl+Enter to open ES6 template literals and other configured multi-line strings or heredocs in any language in a synced editor, with language support (HTML, CSS, SQL, shell, markdown etc).",
     "keywords": [
         "highlight",
@@ -76,7 +76,7 @@
             },
             {
                 "command": "editor.closeSubdocuments",
-                "key": "ctrl+backspace",
+                "key": "ctrl+shift+backspace",
                 "when": "editorTextFocus"
             }
         ],

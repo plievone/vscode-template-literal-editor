@@ -101,9 +101,12 @@ export function activate(_context: vscode.ExtensionContext) {
                 while ((match = matcher.exec(text)) !== null) {
                     if (typeof match[1] === 'string' && typeof match[2] === 'string' && typeof match[3] === 'string') {
                         // Cursor at boundaries is ok, but only inner content is used as a template
-                        if (match.index <= cursorOffset && cursorOffset <= match.index + match[0].length) {
+                        if (match.index <= cursorOffset && cursorOffset <= matcher.lastIndex) {
                             templateStart = match.index + match[1].length;
                             templateEnd = match.index + match[1].length + match[2].length;
+                            break;
+                        } else if (matcher.lastIndex > cursorOffset) {
+                            // Don't bother iterating the rest of the doc
                             break;
                         }
                     }
@@ -135,6 +138,8 @@ export function activate(_context: vscode.ExtensionContext) {
             if (templateStart !== 0) {
                 const languages = await vscode.languages.getLanguages();
                 // How to get proper language list, with icons etc?
+                // Not possible yet I guess:
+                // https://github.com/Microsoft/vscode/blob/5aea732/src/vs/workbench/browser/parts/editor/editorStatus.ts#L747-L763
                 const sorted = [previouslyPickedLanguage].concat(languages.filter(lang => lang !== previouslyPickedLanguage));
                 const pickedLanguage = await vscode.window.showQuickPick(sorted, { placeHolder: 'Open in Language Mode' });
                 if (pickedLanguage) {
@@ -177,10 +182,15 @@ export function activate(_context: vscode.ExtensionContext) {
         // Keep track of document range where template literal resides
         let templateRange = new vscode.Range(start, end);
 
-        // Calculate cursor position relative to viewport top for subdocument scroll to match
+        // // Calculate cursor position relative to viewport top for subdocument scroll to match
         // const cursorPosition = editor.selection.active;
         // await vscode.commands.executeCommand('cursorMove', {
-        //     to: 'viewPortTop'
+        //     to: 'viewPortTop',
+        //     select: false,
+        // });
+        // await vscode.commands.executeCommand('cursorMove', {
+        //     to: 'wrappedLineStart',
+        //     select: false,
         // });
         // const viewPortTopPosition = editor.selection.active;
         // // Move cursor back to where it was
@@ -189,6 +199,7 @@ export function activate(_context: vscode.ExtensionContext) {
         //     by: 'line',
         //     value: cursorPosition.line - viewPortTopPosition.line
         // });
+        // editor.selection = new vscode.Selection(cursorPosition, cursorPosition);
 
         // Only one active subdocument per document allowed for simplicity.
         if (activeDocuments.has(doc)) {
@@ -637,7 +648,7 @@ export function activate(_context: vscode.ExtensionContext) {
                     const activeTextEditor = vscode.window.activeTextEditor;
                     if (activeTextEditor) {
                         if (activeTextEditor.document === subdoc) {
-                            // Common case: closing subeditor via Ctrl+Enter or Ctrl+Backspace when subeditor is in focus.
+                            // Common case: closing subeditor via Ctrl+Enter or Ctrl+Shift+Backspace when subeditor is in focus.
                             // Focus on original document afterwards.
                             returnDoc = doc;
                             returnViewColumn = editorViewColumn;
