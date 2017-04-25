@@ -49,7 +49,7 @@ export function activate(_context: vscode.ExtensionContext) {
                     return;
                 }
             }
-            await findAndOpenTemplateUnderCursor(editor);
+            await findAndOpenLiteralUnderCursor(editor);
         } catch (err) {
             if (DEBUG) {
                 console.error('openSubdocument error: %s', err && err.stack || err);
@@ -72,28 +72,27 @@ export function activate(_context: vscode.ExtensionContext) {
         }
     });
 
-    async function findAndOpenTemplateUnderCursor(editor: vscode.TextEditor) {
+    async function findAndOpenLiteralUnderCursor(editor: vscode.TextEditor) {
         try {
             const doc = editor.document;
             const cursorOffset = doc.offsetAt(editor.selection.active);
             let templateStart = 0;
             let templateEnd = 0;
-            const lang = doc.languageId;
             const config = vscode.workspace.getConfiguration('templateLiteralEditor.regexes');
-            if (config.has(lang) && typeof config.get(lang) === 'string') {
+            if (config.has(doc.languageId) && typeof config.get(doc.languageId) === 'string') {
                 // Just iterates from the top of the document with a regexp. Could have a plugin system of some sort,
                 // enabling custom parsers or expanding from the cursor, or some other scheme.
                 const text = doc.getText();
                 let matcher: RegExp;
                 try {
-                    matcher = new RegExp(config.get(lang) as string, 'g');
+                    matcher = new RegExp(config.get(doc.languageId) as string, 'g');
                 } catch (err) {
                     console.error(
                         'INVALID REGEX in templateLiteralEditor.regexes.%s: %s\n%s',
-                        lang, config.get(lang), err && err.stack || err
+                        doc.languageId, config.get(doc.languageId), err && err.stack || err
                     );
                     await vscode.window.showErrorMessage(
-                        `Invalid regex in templateLiteralEditor.regexes.${lang}: ${config.get(lang)}\n${err && err.stack || err}`
+                        `Invalid regex in templateLiteralEditor.regexes.${doc.languageId}: ${config.get(doc.languageId)}\n${err && err.stack || err}`
                     );
                     throw err;
                 }
@@ -160,13 +159,18 @@ export function activate(_context: vscode.ExtensionContext) {
                 }
             } else {
                 console.warn(
-                    'Template not found under cursor. If in error, please configure proper templateLiteralEditor.regexes.%s',
+                    'Literal not found under cursor. If in error, please modify the source or templateLiteralEditor.regexes.%s configuration for your needs',
                     doc.languageId,
+                );
+                await vscode.window.showWarningMessage(
+                    `Literal not found under cursor. If in error, please modify the source or templateLiteralEditor.regexes.${doc.languageId} configuration for your needs. Please also consider submitting your improved regexes to the vscode-template-literal-editor repository.`,
+                    // Open as modal, so that next enter closes the message quickly without needing a mouse.
+                    { modal: true }
                 );
             }
         } catch (err) {
             if (DEBUG) {
-                console.error('findAndOpenTemplateUnderCursor error: %s', err && err.stack || err);
+                console.error('findAndOpenLiteralUnderCursor error: %s', err && err.stack || err);
             }
             throw err;
         }
