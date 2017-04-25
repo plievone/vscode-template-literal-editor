@@ -7,7 +7,7 @@ Instructions:
 - Open a JavaScript or TypeScript file, or a file in some other language if customized via "templateLiteralEditor.regexes" configuration. Many languages have a starter configuration included.
 - Place cursor inside any template literal string and press Ctrl+Enter.
 - Select language (defaults to html). Remembers the last selection as default.
-- Outermost template literal range opens in the selected language in a side-by-side view, synced with the original. Multiple cursors and undo works as usual, and saving the template results in saving of the original document.
+- Outermost template literal range opens in the selected language in a side-by-side view, synced with the original. Multiple cursors and undo work as usual, and saving the template results in saving of the original document.
 - Enjoy syntax highlighting, completions, formatting, commenting, snippets, your preferred editing extensions, etc!
 - When you edit the original document the template editor is kept in sync. If template boundaries are modified or a sync error happens, then the template literal editor is closed for safety.
 - Ctrl+Enter in the literal editor closes it and keeps the cursor position. Also ordinary close or "Revert And Close Editor" action should work without unnecessary save dialogs. There's also a Ctrl+Shift+Backspace shortcut to close all literal editors quickly, from any editor.
@@ -26,4 +26,6 @@ Developed on VS Code 1.11.0-insider on MacOS, as a personal tool, hoping somethi
 
 ## Contributing
 
-MIT license. Feel free to use the code however you wish. You can find the code inside the extension package, TypeScript sources are included. Public repository for pull requests and issue reporting is on GitHub [plievone/vscode-template-literal-editor](https://github.com/plievone/vscode-template-literal-editor). You can also send in your greetings via User Reviews on [Code Marketplace](https://marketplace.visualstudio.com/items?itemName=plievone.vscode-template-literal-editor).
+MIT license. Feel free to use the code however you wish. You can find the code inside the extension package, TypeScript sources are included. Public repository for pull requests and issue reporting is on GitHub [plievone/vscode-template-literal-editor](https://github.com/plievone/vscode-template-literal-editor). You can also send in your notes and greetings via User Reviews on [Code Marketplace](https://marketplace.visualstudio.com/items?itemName=plievone.vscode-template-literal-editor).
+
+[![Installs](https://vsmarketplacebadge.apphb.com/installs/plievone.vscode-template-literal-editor.svg)](https://marketplace.visualstudio.com/items?itemName=plievone.vscode-template-literal-editor) [![Ratings](https://vsmarketplacebadge.apphb.com/rating/plievone.vscode-template-literal-editor.svg)](https://marketplace.visualstudio.com/items?itemName=plievone.vscode-template-literal-editor)

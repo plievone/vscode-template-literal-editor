@@ -210,11 +210,9 @@ export function activate(_context: vscode.ExtensionContext) {
         // Create subdocument with chosen language.
         // Could be made configurable depending on template tag, keybinding, etc.
 
-        // This form is not in typescript definitions but is documented here
-        // https://code.visualstudio.com/docs/extensionAPI/vscode-api#workspace.openTextDocument
-        // It always creates a new untitled file.
+        // Always creates a new untitled file.
         // NOTE: setting content here to fix undo history including the initially empty doc. v1.11 api only
-        const subdoc = await (vscode.workspace.openTextDocument as any)({ language, content: doc.getText(templateRange) }) as vscode.TextDocument;
+        const subdoc = await vscode.workspace.openTextDocument({ language, content: doc.getText(templateRange) });
 
         activeDocuments.set(doc, { subdoc, async closeSubdocumentWithReason() { } });
 
@@ -418,7 +416,7 @@ export function activate(_context: vscode.ExtensionContext) {
                             } else if (changeRange.end.isBefore(templateRange.start)) {
                                 // General case before template, a bit complex due to depending on both changeRange and
                                 // changeText line count etc
-                                // TODO count with match and use doc.eol from vscode 1.11
+                                // TODO experiment with doc.eol from vscode 1.11
                                 const insertedLines = changeText.split(/\r\n|\r|\n/);
                                 const lineDiff = insertedLines.length - (changeRange.end.line - changeRange.start.line + 1);
                                 let charDiff = 0;
@@ -456,7 +454,7 @@ export function activate(_context: vscode.ExtensionContext) {
                             } else if (templateRange.contains(changeRange)) {
                                 // General case inside template, also a bit complex due to depending on both changeRange and
                                 // changeText line count etc
-                                // TODO count with match and use doc.eol from vscode 1.11
+                                // TODO experiment with doc.eol from vscode 1.11
                                 const insertedLines = changeText.split(/\r\n|\r|\n/);
                                 const lineDiff = insertedLines.length - (changeRange.end.line - changeRange.start.line + 1);
                                 let charDiff = 0;
