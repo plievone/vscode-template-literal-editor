@@ -101,6 +101,7 @@ export function activate(_context: vscode.ExtensionContext) {
                     if (typeof match[1] === 'string' && typeof match[2] === 'string' && typeof match[3] === 'string') {
                         // Cursor at boundaries is ok, but only inner content is used as a template
                         if (match.index <= cursorOffset && cursorOffset <= matcher.lastIndex) {
+                            // NOTE also surrogates work ok, as vscode column counter uses the same measurement as str.length
                             templateStart = match.index + match[1].length;
                             templateEnd = match.index + match[1].length + match[2].length;
                             break;
@@ -431,6 +432,7 @@ export function activate(_context: vscode.ExtensionContext) {
                                     // first remove changeRange chars, it does not matter if there are multiple lines
                                     charDiff -= (changeRange.end.character - changeRange.start.character);
                                     // then add new changeText chars, only last line counts
+                                    // NOTE also surrogates work ok, as vscode column counter uses the same measurement as str.length
                                     charDiff += insertedLines[insertedLines.length - 1].length;
                                     if (insertedLines.length > 1) {
                                         // If a line break is introduced, push to beginning of line
@@ -470,6 +472,7 @@ export function activate(_context: vscode.ExtensionContext) {
                                     // first remove changeRange chars, it does not matter if there are multiple lines
                                     charDiff -= (changeRange.end.character - changeRange.start.character);
                                     // then add new changeText chars, only last line counts
+                                    // NOTE also surrogates work ok, as vscode column counter uses the same measurement as str.length
                                     charDiff += insertedLines[insertedLines.length - 1].length;
                                     if (insertedLines.length > 1) {
                                         // If a line break is introduced, the last line starts at the beginning of line

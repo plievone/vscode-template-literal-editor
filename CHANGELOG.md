@@ -1,5 +1,6 @@
 Changelog:
 
+- [2018-04-08] v0.8.5 - Enabled for js template literals inside html files.
 - [2017-04-25] v0.8.4 - Modified the default regexes for Erlang, F#, Julia, Kotlin, OCaml, R. Also added an informational message if a literal could not be found under the cursor with the current regex configuration. Should be quick to close with enter, but please complain if it is too intrusive for you.
 - [2017-04-25] v0.8.3 - Added default regexes for OCaml, R, Scala, Visual Basic. If you are using any of the regexes (i.e. any other language than JavaScript or TypeScript) and would like to see some improvements (such as configuring multiple literal styles for a language via an array of regexes, or notifications also outside dev tools when literal could not be found with the configured regex) please make yourself heard by filing an issue in the repository. Also included the compiled extension to repository, so the repo can be installed directly if needed, and possible changes in typescript emit will be easier to diff.
 - [2017-04-20] v0.8.2 - Changed the default keybinding of the rarely used close all literal editors action from Ctrl+Backspace to Ctrl+Shift+Backspace, as it shadowed an existing command.
