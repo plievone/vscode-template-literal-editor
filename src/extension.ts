@@ -9,6 +9,8 @@ import throttle = require('lodash.throttle');
 
 // TODO Clean up artificial delays to only those that are really needed, but testing those seems flaky.
 
+const SYNC_THROTTLE_MS = 100;
+
 const DEBUG = false;
 
 if (DEBUG) {
@@ -255,6 +257,10 @@ export function activate(_context: vscode.ExtensionContext) {
             lineNumber: subeditor.selection.active.line,
             at: 'center'
         });
+        // await vscode.commands.executeCommand('editorScroll', {
+        //     to: 'down',
+        //     revealCursor: true,
+        // });
 
         // const decorationType = vscode.window.createTextEditorDecorationType({
         //     isWholeLine: true,
@@ -295,7 +301,7 @@ export function activate(_context: vscode.ExtensionContext) {
         //
         //         })().catch(err => {
         //             if (DEBUG) {
-        //                 console.error('didChangeSelection error: %s', err && err.stack || err);
+        //                 console.error('didChangeSelection error: %s', err && err.stack || err);
         //             }
         //             throw err;
         //         });
@@ -501,7 +507,19 @@ export function activate(_context: vscode.ExtensionContext) {
 
         // Throttle sync document edits, so that editing the subdocument stays quick.
         // As there are async functions involved which may have a delay, may need guarding transactions if errors start to appear.
+        // NOTE: latest vscode edits (v1.22->) are slower than previously, so guards against re-entrancy instead of
+        // increasing throttling, to keep it snappy
+        let isSyncingToDocument = false;
         const throttledSyncToDocument = throttle(async () => {
+            if (isSyncingToDocument) {
+                if (DEBUG) {
+                    console.warn('throttledSyncToDocument overlap, will defer');
+                }
+                // Calls function again to not miss edits in case this is the last invocation in this stall.
+                throttledSyncToDocument();
+                return;
+            }
+            isSyncingToDocument = true;
             try {
                 // We have to always take a new reference to the editor, as it may have been hidden
                 // and a new editor may need to be created.
@@ -543,15 +561,29 @@ export function activate(_context: vscode.ExtensionContext) {
                         console.error('throttledSyncToDocument error: %s', err2 && err2.stack || err2);
                     }
                 }
+            } finally {
+                isSyncingToDocument = false;
             }
-        }, 100);
+        }, SYNC_THROTTLE_MS);
 
         // Throttle sync subdocument edits, so that editing document stays snappy
         // This might be a bit more costly due to enabled language services in subdocument, so increase
         // delay if needed. Delay could be made configurable.
         // NOTE: If a large delay is needed, everything here may need to be guarded against subdocument
         // closing before or in the middle of execution. But let's keep this simple and quick for now.
+        // NOTE: latest vscode edits (v1.22->) are slower than previously, so guards against re-entrancy instead of
+        // increasing throttling, to keep it snappy
+        let isSyncingToSubdocument = false;
         const throttledSyncToSubdocument = throttle(async () => {
+            if (isSyncingToSubdocument) {
+                if (DEBUG) {
+                    console.warn('throttledSyncToSubdocument overlap, will defer');
+                }
+                // Calls function again to not miss edits in case this is the last invocation in this stall.
+                throttledSyncToSubdocument();
+                return;
+            }
+            isSyncingToSubdocument = true;
             try {
                 // We have to always take a new reference to the editor, as it may have been hidden
                 // and a new editor may need to be created.
@@ -588,8 +620,10 @@ export function activate(_context: vscode.ExtensionContext) {
                         console.error('throttledSyncToSubdocument error: %s', err2 && err2.stack || err2);
                     }
                 }
+            } finally {
+                isSyncingToSubdocument = false;
             }
-        }, 100);
+        }, SYNC_THROTTLE_MS);
 
         async function closeSubdocumentWithReason(reason: string) {
             try {
@@ -676,7 +710,9 @@ export function activate(_context: vscode.ExtensionContext) {
                     // Artificial delay, to prevent "TextEditor disposed" warning (in Extension Development Host only).
                     await shortDelay();
 
-                    await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+                    if (vscode.window.activeTextEditor && vscode.window.activeTextEditor.document === subdoc) {
+                        await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+                    }
                     await shortDelay();
                     // May need a bit longer delay for larger documents in some environments, as the revealed editor is initializing?
                     // Get rid of these when VS Code race conditions are sorted out and focus is shifted
@@ -695,14 +731,20 @@ export function activate(_context: vscode.ExtensionContext) {
                         // Artificial delay, to prevent "TextEditor disposed" warning (in Extension Development Host only).
                         await shortDelay();
                         if (returnPos) {
-                            await moveActiveCursorTo(returnPos);
-                            // Center viewport if possible, for now, until line sync is possible
-                            if (vscode.window.activeTextEditor) {
-                                await vscode.commands.executeCommand('revealLine', {
-                                    lineNumber: vscode.window.activeTextEditor.selection.active.line,
-                                    at: 'center'
-                                });
-                                await shortDelay();
+                            if (vscode.window.activeTextEditor && vscode.window.activeTextEditor.document === doc) {
+                                await moveActiveCursorTo(returnPos);
+                                // Don't center viewport for now, until line sync is possible
+                                if (vscode.window.activeTextEditor) {
+                                    // await vscode.commands.executeCommand('revealLine', {
+                                    //     lineNumber: vscode.window.activeTextEditor.selection.active.line,
+                                    //     at: 'center'
+                                    // });
+                                    // await vscode.commands.executeCommand('editorScroll', {
+                                    //     to: 'down',
+                                    //     revealCursor: true,
+                                    // });
+                                    await shortDelay();
+                                }
                             }
                         }
                     }

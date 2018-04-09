@@ -4,15 +4,16 @@
         {
             "type": "extensionHost",
             "request": "launch",
-            "name": "Launch Extension",
+            "name": "Extension",
             "runtimeExecutable": "${execPath}",
             "args": [
-                "--extensionDevelopmentPath=${workspaceRoot}"
+                "--extensionDevelopmentPath=${workspaceFolder}"
             ],
             "sourceMaps": true,
             "outFiles": [
                 "${workspaceRoot}/lib/**/*"
-            ]
+            ],
+            "preLaunchTask": "npm: dev"
         }
     ]
 }
