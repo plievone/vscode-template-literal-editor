@@ -2,16 +2,16 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Run Extension",
             "type": "extensionHost",
             "request": "launch",
-            "name": "Extension",
             "runtimeExecutable": "${execPath}",
             "args": [
                 "--extensionDevelopmentPath=${workspaceFolder}"
             ],
             "sourceMaps": true,
             "outFiles": [
-                "${workspaceRoot}/lib/**/*"
+                "${workspaceFolder}/lib/**/*"
             ],
             "preLaunchTask": "npm: dev"
         }

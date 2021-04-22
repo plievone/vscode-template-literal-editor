@@ -1,7 +1,7 @@
 {
     "name": "vscode-template-literal-editor",
     "displayName": "Template Literal Editor",
-    "version": "0.9.0",
+    "version": "0.10.0",
     "description": "Use Ctrl+Enter to open ES6 template literals and other configured multi-line strings or heredocs in any language in a synced editor, with language support (HTML, CSS, SQL, shell, markdown etc).",
     "keywords": [
         "highlight",
@@ -61,7 +61,7 @@
         "url": "https://github.com/plievone/vscode-template-literal-editor.git"
     },
     "engines": {
-        "vscode": "^1.11.0"
+        "vscode": "^1.53.0"
     },
     "categories": [
         "Programming Languages",
@@ -70,7 +70,7 @@
     "activationEvents": [
         "onCommand:editor.openSubdocument"
     ],
-    "main": "./lib/extension",
+    "main": "./lib/extension.js",
     "contributes": {
         "commands": [
             {
@@ -149,16 +149,15 @@
     "scripts": {
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -p ./",
-        "dev": "tsc -w -p ./",
-        "postinstall": "node ./node_modules/vscode/bin/install"
+        "dev": "tsc -w -p ./"
     },
     "dependencies": {
         "lodash.throttle": "4.1.1",
-        "typescript": "^2.8.1"
+        "typescript": "^4.2.4"
     },
     "devDependencies": {
-        "@types/lodash.throttle": "^4.1.3",
-        "@types/node": "^8.10.3",
-        "vscode": "^1.1.14"
+        "@types/lodash.throttle": "^4.1.6",
+        "@types/node": "^12.20.10",
+        "@types/vscode": "^1.53.0"
     }
 }

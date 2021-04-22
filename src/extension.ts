@@ -14,7 +14,7 @@ const SYNC_THROTTLE_MS = 100;
 const DEBUG = false;
 
 if (DEBUG) {
-    process.on('unhandledRejection', (_p: Promise<any>, reason: any) => {
+    process.on('unhandledRejection', (reason: any, _p: Promise<any>) => {
         console.warn('UNHANDLED: %s', reason && reason.stack || reason);
     });
 }
@@ -794,7 +794,7 @@ async function shortDelay() {
     // await new Promise(resolve => { setImmediate(resolve); });
     // Deferring to the beginning of next event loop run seems too short for extension api implementation.
     // There should be a ping of some sort, or should this delay be configurable, to please slow environments?
-    await new Promise(resolve => {
+    await new Promise<void>(resolve => {
         setTimeout(() => {
             resolve();
         }, 0);
